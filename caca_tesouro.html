@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Caça ao Tesouro - Theo</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: system-ui, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 16px;
+            background: #F0F4F8;
+            color: #1a1a2e;
+        }
+        .container {
+            max-width: 550px;
+            margin: 0 auto;
+        }
+        .card {
+            background: white;
+            border-radius: 24px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .titulo {
+            text-align: center;
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .subtitulo {
+            text-align: center;
+            color: #555;
+            margin-bottom: 24px;
+        }
+        .tesouro-icon {
+            font-size: 64px;
+            text-align: center;
+            margin: 16px 0;
+        }
+        .pista-nome {
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .termometro {
+            margin: 20px 0;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 24px;
+            background-color: #e0e0e0;
+            border-radius: 12px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+        .progress-fill {
+            width: 0%;
+            height: 100%;
+            background-color: #3498db;
+            transition: width 0.3s ease;
+        }
+        .distancia-text {
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+            margin: 8px 0;
+        }
+        .bip-status {
+            text-align: center;
+            font-size: 14px;
+            color: #666;
+            margin: 8px 0;
+        }
+        .gps-info {
+            background: #f0f0f0;
+            border-radius: 12px;
+            padding: 10px;
+            font-size: 14px;
+            text-align: center;
+            margin: 12px 0;
+            word-break: break-word;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 8px 5px;
+            width: auto;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .btn-achei { background: #2E7D32; }
+        .btn-reconfig { background: #FF9800; }
+        .config-pistas {
+            background: #fff3e0;
+            padding: 16px;
+            border-radius: 16px;
+            margin-top: 20px;
+        }
+        .pista-item {
+            border-bottom: 1px solid #ddd;
+            padding: 12px 0;
+        }
+        .pista-header {
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .coord-input {
+            width: 110px;
+            padding: 6px;
+            margin: 4px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+        .btn-capturar {
+            background: #2196F3;
+            font-size: 12px;
+            padding: 6px 12px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 12px;
+            color: #888;
+        }
+        .erro {
+            background: #ffebee;
+            color: #c62828;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        @media (max-width: 500px) {
+            .coord-input { width: 90px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container" id="app">
+    <!-- Tela de Configuração -->
+    <div id="telaConfig">
+        <div class="card">
+            <div class="titulo">🏆 Caça ao Tesouro do Theo 🏆</div>
+            <div class="subtitulo">Digite as coordenadas ou use <strong>📍 Capturar</strong> (GPS do celular)</div>
+            <div id="listaPistas"></div>
+            <div style="text-align: center; margin-top: 24px;">
+                <button id="btnIniciar">▶️ Iniciar Caça</button>
+            </div>
+            <div id="msgErro" class="erro" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Tela do Jogo -->
+    <div id="telaJogo" style="display: none;">
+        <div class="card">
+            <div class="tesouro-icon" id="iconeTesouro">🏊</div>
+            <div class="pista-nome" id="nomePista">Pista 1</div>
+            <div class="termometro">
+                <div class="distancia-text" id="distanciaText">--- m</div>
+                <div class="progress-bar"><div class="progress-fill" id="barraTermometro"></div></div>
+                <div class="bip-status" id="bipStatus">🔊 Aguardando localização...</div>
+            </div>
+            <div class="gps-info" id="gpsInfo">📍 Aguardando GPS...</div>
+            <div style="text-align: center;">
+                <button id="btnAchei" class="btn-achei" disabled>✅ ACHEI A PISTA!</button>
+                <button id="btnReconfig" class="btn-reconfig">⚙️ Reconfigurar Pistas</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        // --- Dados iniciais (exemplo)
+        let pistas = [
+            { icone: "🏊", nome: "Pista 1", lat: -23.5505, lon: -46.6333 },
+            { icone: "🍿", nome: "Pista 2", lat: -23.5500, lon: -46.6340 },
+            { icone: "🔥", nome: "Pista 3", lat: -23.5510, lon: -46.6325 },
+            { icone: "🎈", nome: "Pista 4", lat: -23.5495, lon: -46.6345 },
+            { icone: "⭐", nome: "Pista 5", lat: -23.5508, lon: -46.6338 }
+        ];
+        let pistaAtual = 0;
+        let watchId = null;
+        let intervaloBip = null;
+        let audioCtx = null;
+        let gpsAtivo = false;
+
+        // Elementos
+        const telaConfig = document.getElementById('telaConfig');
+        const telaJogo = document.getElementById('telaJogo');
+        const listaPistasDiv = document.getElementById('listaPistas');
+        const iconeTesouro = document.getElementById('iconeTesouro');
+        const nomePistaSpan = document.getElementById('nomePista');
+        const distanciaText = document.getElementById('distanciaText');
+        const barraTermometro = document.getElementById('barraTermometro');
+        const bipStatus = document.getElementById('bipStatus');
+        const gpsInfo = document.getElementById('gpsInfo');
+        const btnAchei = document.getElementById('btnAchei');
+        const btnReconfig = document.getElementById('btnReconfig');
+        const btnIniciar = document.getElementById('btnIniciar');
+        const msgErro = document.getElementById('msgErro');
+
+        // Função para salvar pistas no localStorage (opcional)
+        function salvarPistas() {
+            try {
+                localStorage.setItem('pistas_caca', JSON.stringify(pistas));
+            } catch(e) { console.warn(e); }
+        }
+
+        function carregarPistas() {
+            try {
+                const saved = localStorage.getItem('pistas_caca');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (Array.isArray(parsed) && parsed.length === pistas.length) {
+                        pistas = parsed;
+                    }
+                }
+            } catch(e) { console.warn(e); }
+            renderizarConfiguracao();
+        }
+
+        function renderizarConfiguracao() {
+            if (!listaPistasDiv) return;
+            listaPistasDiv.innerHTML = '';
+            for (let idx = 0; idx < pistas.length; idx++) {
+                const p = pistas[idx];
+                const div = document.createElement('div');
+                div.className = 'pista-item';
+                div.innerHTML = `
+                    <div class="pista-header">${p.icone} ${p.nome}</div>
+                    <div>
+                        <input type="number" step="any" class="coord-input" id="lat_${idx}" value="${p.lat}" placeholder="Latitude" step="any">
+                        <input type="number" step="any" class="coord-input" id="lon_${idx}" value="${p.lon}" placeholder="Longitude" step="any">
+                        <button class="btn-capturar" data-idx="${idx}">📍 Capturar</button>
+                    </div>
+                `;
+                listaPistasDiv.appendChild(div);
+            }
+            // Adicionar eventos aos botões de capturar
+            document.querySelectorAll('.btn-capturar').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const idx = parseInt(btn.getAttribute('data-idx'));
+                    await capturarCoordenada(idx);
+                });
+            });
+        }
+
+        async function capturarCoordenada(idx) {
+            if (!navigator.geolocation) {
+                alert("Geolocalização não suportada neste navegador.");
+                return;
+            }
+            bipStatus.innerText = "🔍 Obtendo localização...";
+            try {
+                const pos = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000 });
+                });
+                const lat = pos.coords.latitude;
+                const lon = pos.coords.longitude;
+                const latInput = document.getElementById(`lat_${idx}`);
+                const lonInput = document.getElementById(`lon_${idx}`);
+                if (latInput) latInput.value = lat;
+                if (lonInput) lonInput.value = lon;
+                pistas[idx].lat = lat;
+                pistas[idx].lon = lon;
+                salvarPistas();
+                bipStatus.innerText = `✅ Pista ${idx+1} coordenadas capturadas!`;
+                setTimeout(() => { bipStatus.innerText = ""; }, 2000);
+            } catch (err) {
+                alert("Erro ao obter GPS: " + err.message);
+                bipStatus.innerText = "❌ Não foi possível obter GPS. Verifique permissões.";
+            }
+        }
+
+        function iniciarJogo() {
+            // Atualizar pistas com os valores dos inputs
+            for (let i = 0; i < pistas.length; i++) {
+                const latInput = document.getElementById(`lat_${i}`);
+                const lonInput = document.getElementById(`lon_${i}`);
+                if (latInput && lonInput) {
+                    const lat = parseFloat(latInput.value);
+                    const lon = parseFloat(lonInput.value);
+                    if (!isNaN(lat) && !isNaN(lon)) {
+                        pistas[i].lat = lat;
+                        pistas[i].lon = lon;
+                    }
+                }
+            }
+            salvarPistas();
+            pistaAtual = 0;
+            // Alternar telas
+            telaConfig.style.display = 'none';
+            telaJogo.style.display = 'block';
+            atualizarInterfaceTesouro();
+            // Iniciar GPS
+            iniciarGPS();
+            // Mensagem de voz (se suportado)
+            if (window.speechSynthesis) {
+                const msg = new SpeechSynthesisUtterance("Bem-vindo à caça ao tesouro do Theo. Theo, não se esqueça: sua família te ama!");
+                msg.lang = 'pt-BR';
+                msg.rate = 1.1;
+                window.speechSynthesis.speak(msg);
+            }
+            // Aguardar um pouco para iniciar o bip (enquanto a mensagem é dita)
+            setTimeout(() => {
+                if (gpsAtivo) {
+                    bipStatus.innerText = "🔊 Bip ativo! Aproxime-se do tesouro.";
+                }
+            }, 4000);
+        }
+
+        function atualizarInterfaceTesouro() {
+            const p = pistas[pistaAtual];
+            iconeTesouro.innerText = p.icone;
+            nomePistaSpan.innerText = `${p.nome}`;
+        }
+
+        function calcularDistancia(lat1, lon1, lat2, lon2) {
+            const R = 6371000;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        function tocarBipContinuo(distancia) {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            let frequencia = 600;
+            let intervalo = 1.5;
+            if (distancia < 3) {
+                frequencia = 3000;
+                intervalo = 0.07;
+            } else if (distancia < 8) {
+                frequencia = 2500;
+                intervalo = 0.15;
+            } else if (distancia < 15) {
+                frequencia = 2000;
+                intervalo = 0.3;
+            } else if (distancia < 30) {
+                frequencia = 1500;
+                intervalo = 0.6;
+            } else if (distancia < 50) {
+                frequencia = 1000;
+                intervalo = 1.0;
+            } else {
+                frequencia = 600;
+                intervalo = 1.5;
+            }
+            if (intervaloBip) clearInterval(intervaloBip);
+            intervaloBip = setInterval(() => {
+                if (!gpsAtivo) return;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.frequency.value = frequencia;
+                gain.gain.value = 0.2;
+                osc.start();
+                gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.1);
+                osc.stop(audioCtx.currentTime + 0.1);
+            }, intervalo * 1000);
+        }
+
+        function pararBip() {
+            if (intervaloBip) {
+                clearInterval(intervaloBip);
+                intervaloBip = null;
+            }
+        }
+
+        function atualizarTermometro(distancia) {
+            const maxDist = 50;
+            let percent = Math.min(1, distancia / maxDist);
+            percent = 1 - percent;
+            barraTermometro.style.width = (percent * 100) + "%";
+            distanciaText.innerText = `${distancia.toFixed(1)} m`;
+            if (percent > 0.8) {
+                barraTermometro.style.backgroundColor = "#e74c3c";
+                distanciaText.innerHTML = `🌋 ${distancia.toFixed(1)} m`;
+                btnAchei.disabled = false;
+            } else if (percent > 0.5) {
+                barraTermometro.style.backgroundColor = "#f39c12";
+                btnAchei.disabled = true;
+            } else if (percent > 0.2) {
+                barraTermometro.style.backgroundColor = "#f1c40f";
+                btnAchei.disabled = true;
+            } else {
+                barraTermometro.style.backgroundColor = "#3498db";
+                btnAchei.disabled = true;
+            }
+            if (gpsAtivo && percent < 1) {
+                tocarBipContinuo(distancia);
+            } else {
+                pararBip();
+            }
+        }
+
+        function iniciarGPS() {
+            if (!navigator.geolocation) {
+                gpsInfo.innerText = "Geolocalização não suportada.";
+                return;
+            }
+            gpsAtivo = true;
+            if (watchId) navigator.geolocation.clearWatch(watchId);
+            watchId = navigator.geolocation.watchPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    gpsInfo.innerText = `Lat: ${lat.toFixed(6)} | Lon: ${lon.toFixed(6)}`;
+                    const alvo = pistas[pistaAtual];
+                    if (alvo) {
+                        const dist = calcularDistancia(lat, lon, alvo.lat, alvo.lon);
+                        atualizarTermometro(dist);
+                    }
+                },
+                (err) => {
+                    gpsInfo.innerText = "Erro GPS: " + err.message;
+                    gpsAtivo = false;
+                },
+                { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+            );
+        }
+
+        function pararGPS() {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+            gpsAtivo = false;
+            pararBip();
+        }
+
+        function proximaPista() {
+            pistaAtual++;
+            if (pistaAtual < pistas.length) {
+                atualizarInterfaceTesouro();
+                btnAchei.disabled = true;
+                // Reinicia o termômetro para a nova pista (já vai ser atualizado pelo GPS)
+            } else {
+                alert("🏆 Parabéns! Você completou todas as pistas! 🏆");
+                btnAchei.disabled = true;
+                pararGPS();
+                // Voltar à configuração após 2 segundos
+                setTimeout(() => voltarConfiguracao(), 3000);
+            }
+        }
+
+        function voltarConfiguracao() {
+            pararGPS();
+            if (audioCtx) {
+                audioCtx.close();
+                audioCtx = null;
+            }
+            telaJogo.style.display = 'none';
+            telaConfig.style.display = 'block';
+            renderizarConfiguracao();
+        }
+
+        // Inicializar eventos
+        if (btnIniciar) btnIniciar.addEventListener('click', iniciarJogo);
+        if (btnAchei) btnAchei.addEventListener('click', proximaPista);
+        if (btnReconfig) btnReconfig.addEventListener('click', voltarConfiguracao);
+
+        // Para ativar o áudio no primeiro toque (requer interação do usuário)
+        document.body.addEventListener('touchstart', function initAudio() {
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            document.body.removeEventListener('touchstart', initAudio);
+        });
+        document.body.addEventListener('click', function initAudioClick() {
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        });
+
+        // Carregar e renderizar
+        carregarPistas();
+    })();
+</script>
+</body>
+</html>
